@@ -1,0 +1,56 @@
+services:
+  api:
+    build: ./api
+    container_name: sre-api
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    container_name: sre-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: sre-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_DEFAULT_THEME: light
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # 부하 생성기는 기본 실행에 포함하지 않는다 (--profile load 필요).
+  # baseline 트래픽: docker compose --profile load up
+  # 단일 시나리오:   docker compose run --rm loadgen run /scripts/<script>.js
+  loadgen:
+    image: grafana/k6:0.54.0
+    container_name: sre-loadgen
+    profiles: ["load"]
+    volumes:
+      - ./k6:/scripts:ro
+    environment:
+      K6_API_BASE: http://api:8000
+    command: ["run", "/scripts/normal.js"]
+    depends_on:
+      - api

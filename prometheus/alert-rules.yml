@@ -1,0 +1,6 @@
+# Alert rule 정의는 Phase 4에서 채운다.
+# (Down / HighErrorRate / HighLatencyP95, 트래픽 가드 포함)
+groups:
+  - name: api-slo-alerts
+    interval: 15s
+    rules: []
