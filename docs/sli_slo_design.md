@@ -268,6 +268,24 @@ incident 발생 시 원인을 좁히는 용도다. 구현은 `psycopg_pool.Conne
 `operation` 라벨은 `readiness`, `list_courses`, `get_course` 세 가지로
 제한되어 cardinality는 안전한 수준이다.
 
+#### DB timeout 계층 (실서비스 확장)
+
+본 과제는 **connection acquire timeout** 하나만 설정한다
+(`pool.connection(timeout=2.0)`). 실서비스에서는 다음 3개를 함께 설정해야
+느린 쿼리와 네트워크 지연이 worker pool을 장시간 점유하지 않는다.
+
+| 종류 | 설정 위치 | 의미 |
+|---|---|---|
+| connection acquire | `pool.connection(timeout=...)` | pool에서 idle connection을 받기까지의 대기 한도 |
+| statement | PostgreSQL `statement_timeout` (DSN parameter 또는 `SET LOCAL statement_timeout`) | SQL 한 문장의 실행 한도 |
+| connect | `connect_timeout` (DSN parameter) | 신규 connection 수립 한도 |
+
+본 과제는 seed table 단순 조회만 하므로 statement timeout 모델링이 불필요하나,
+실 운영에서는 사용자 latency budget을 분해하여 각 timeout을 설정해야 한다
+(예: SLO p95 300ms = connect 50ms + acquire 50ms + statement 200ms 합산).
+이 세 timeout이 모두 적절히 설정되지 않으면 DB 일부 노드 장애가 worker
+thread를 점유해 사용자 timeout cascade로 번질 수 있다.
+
 ---
 
 ## 5. Alert 설계

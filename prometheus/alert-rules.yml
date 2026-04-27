@@ -1,6 +1,69 @@
-# Alert rule 정의는 Phase 4에서 채운다.
-# (Down / HighErrorRate / HighLatencyP95, 트래픽 가드 포함)
+# Alert rules. 본 파일의 각 alert PromQL은 docs/sli_slo_design.md §5.2와
+# 1:1 매칭된다. paging은 user-facing symptom 기반(Symptom-based alerting),
+# DB-specific alert는 의도적으로 만들지 않는다 (§4.5 참조).
+#
+# 트래픽 가드 (`and sum(rate(...)) > 0.1`)는 분모 0/NaN 방어 목적.
+# 0.1 RPS = 분당 6건 미만이면 SLI 신호 자체가 통계적으로 무의미.
+
 groups:
   - name: api-slo-alerts
     interval: 15s
-    rules: []
+    rules:
+      - alert: APIInstanceDown
+        expr: up{job="api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: courses-api
+        annotations:
+          summary: "API instance is down (scrape failed)"
+          description: |
+            Prometheus가 api 인스턴스를 1분 이상 scrape 하지 못함.
+            user-visible SLI는 아니지만 scrape 불가 = 관측 불능 + 인스턴스 장애를
+            동시에 의미하므로 critical로 둔다.
+          impact: "사용자 요청 100% 영향 가능성 + 메트릭/alert 자체 동작 불능."
+          runbook: "README.md#runbook-apiinstancedown"
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{route=~"/api/v1/.*",status=~"5.."}[2m]))
+            /
+            sum(rate(http_requests_total{route=~"/api/v1/.*"}[2m]))
+          ) > 0.05
+          and
+          sum(rate(http_requests_total{route=~"/api/v1/.*"}[2m])) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          service: courses-api
+          slo: error_rate
+        annotations:
+          summary: "User-facing 5xx error rate > 5%"
+          description: |
+            사용자 API의 5xx 비율이 2분간 5%를 초과 (트래픽 > 0.1 RPS).
+            burn rate ≈ 50x — 이 속도가 14.4시간 지속되면 30일 SLO(99.9%) 침범.
+          impact: "사용자가 요청 실패를 직접 보고 있음. error budget 빠르게 소진 중."
+          runbook: "README.md#runbook-higherrorrate"
+
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by(le) (rate(http_request_duration_seconds_bucket{route=~"/api/v1/.*"}[2m]))
+          ) > 0.5
+          and
+          sum(rate(http_requests_total{route=~"/api/v1/.*"}[2m])) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: courses-api
+          slo: latency_p95
+        annotations:
+          summary: "User-facing p95 latency > 500ms"
+          description: |
+            사용자 API p95 응답 시간이 2분간 500ms 초과 (트래픽 > 0.1 RPS).
+            SLO 300ms 침범. histogram bucket이 0.3/0.5에 정확히 위치 (오차 최소).
+          impact: |
+            사용자가 응답 지연을 체감 (degraded UX). 5xx는 아니지만 client timeout
+            전환 위험. 지속 시 runbook의 escalation 정책 적용.
+          runbook: "README.md#runbook-highlatencyp95"
