@@ -392,6 +392,17 @@ sum(rate(http_requests_total{route=~"/api/v1/.*"}[2m])) > 0.1
 시각이 빨간 세로선으로 표시되어, 별도의 incident timeline 작성 없이도 dashboard
 자체가 사후 분석 자료가 된다.
 
+**DB 의존성 incident에는 별도 annotation을 만들지 않았다.** DB 장애는
+세 가지 신호가 동시에 나타나기 때문에 추가 marker가 불필요하다.
+
+1. `db_errors_total` 증가 (DB Errors Rate 패널에 즉시 visible)
+2. `/readyz` 503 (Status Code Distribution 패널에 503 비율 증가)
+3. `HighErrorRate` alert firing (paging signal)
+
+반면 `fault-mode`는 정상 트래픽과 시각적으로 동일해 보일 수 있어 — 특히
+`slow` 모드는 5xx 없이 latency만 증가시키므로 — 별도 annotation으로 명시적
+marker가 필요하다.
+
 ### 6.3 Provisioning 자동화
 
 모든 datasource와 dashboard는 `grafana/provisioning/`로 자동 등록된다.
@@ -504,3 +515,4 @@ sum(rate(http_requests_total{route=~"/api/v1/.*"}[2m])) > 0.1
 | 15 | Postgres 1개를 dependency failure propagation 시연용으로 추가 (ORM/migration/캐시 제외) | §1.1, §7.7 |
 | 16 | `/readyz`는 DB SELECT 1로 검증 — 다만 데모 환경에는 routing 계층이 없어 traffic 차단 미발생 | §2, §7.9 |
 | 17 | DB 메트릭은 diagnostic signal로 분리, paging alert는 user-facing SLI가 담당 | §4.5 |
+| 18 | DB incident는 별도 annotation 없이 `db_errors_total` + readyz 503 + HighErrorRate firing 세 신호로 시각화 | §6.2 |

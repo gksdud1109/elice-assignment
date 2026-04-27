@@ -2,6 +2,9 @@ apiVersion: 1
 
 datasources:
   - name: Prometheus
+    # uid를 명시해야 dashboard JSON이 안정적으로 참조할 수 있다.
+    # 자동 생성 UID는 환경마다 달라져 dashboard 재현성을 깨뜨린다.
+    uid: prometheus
     type: prometheus
     access: proxy
     url: http://prometheus:9090
