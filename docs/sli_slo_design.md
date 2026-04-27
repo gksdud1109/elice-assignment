@@ -320,7 +320,7 @@ Severity는 사용자 영향도 기준으로 분리한다.
 다만 scrape 불가 = 관측 불능 + 인스턴스 장애를 동시에 의미하므로, 사용자
 영향이 직접적인 critical로 둔다.
 
-Alert rule 구현 시 아래 PromQL을 `prometheus/alert-rules.yml`에 반영한다.
+아래 PromQL은 `prometheus/alert-rules.yml`에 동일하게 구현되어 있다 (1:1 매칭).
 
 상세 PromQL:
 
@@ -381,6 +381,25 @@ sum(rate(http_requests_total{route=~"/api/v1/.*"}[2m])) > 0.1
 본 과제에서는 fault 주입/복구가 단일 API call이므로 MTTR이 수단상
 실제 운영보다 짧다. RCA에서는 실제 장애라면 발견, 판단, 승인 시간이 추가로
 발생한다는 점을 함께 기재한다.
+
+### 5.6 No-data 정책과 alert 간 역할 분리
+
+scrape 자체가 실패하면 (`up == 0`), `HighErrorRate`와 `HighLatencyP95`의
+expr이 NaN이 되어 evaluation이 멈춘다. 이는 결함이 아니라 의도된 분리다.
+
+- **`APIInstanceDown`** (1m, critical): scrape 자체 실패를 단독으로 담당
+- **`HighErrorRate` / `HighLatencyP95`** (2m, ratio): 트래픽이 존재하는 한에서
+  user-facing 신호를 담당
+
+이 구조 덕분에 ratio alert에 `up == 1`을 추가 조건으로 묶지 않아도 paging
+채널에 공백이 생기지 않는다. 또한 두 ratio alert의 PromQL이 단순해지고,
+"트래픽이 있을 때만 의미 있는 신호"라는 의도가 분명해진다.
+
+존재하지 않는 메트릭에 대한 Prometheus 기본 동작은 NaN → evaluation skip이며,
+alert는 발화하지도 resolve하지도 않는다. 본 과제는 단일 인스턴스 단일 scrape
+환경이라 `APIInstanceDown` 하나로 충분하다. 다중 인스턴스로 확장할 경우
+`absent(up{job="api"})` 같은 dead-man's-switch alert를 별도로 추가해 "전체
+job이 사라진" 케이스도 감지해야 한다.
 
 ---
 

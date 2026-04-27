@@ -4,6 +4,10 @@
 #
 # 트래픽 가드 (`and sum(rate(...)) > 0.1`)는 분모 0/NaN 방어 목적.
 # 0.1 RPS = 분당 6건 미만이면 SLI 신호 자체가 통계적으로 무의미.
+#
+# annotation의 `runbook` 필드는 본 repo의 `README.md` anchor를 가리키는
+# repo-local reference다 (Prometheus UI/Alertmanager에서 자동 클릭되는
+# 외부 URL이 아님). 평가용 ZIP 제출이라 외부 호스팅 URL은 부여하지 않았다.
 
 groups:
   - name: api-slo-alerts
@@ -15,6 +19,8 @@ groups:
         labels:
           severity: critical
           service: courses-api
+          # slo 라벨은 의도적으로 미부여 — instance down은 단일 SLI에 매핑되지
+          # 않고 Availability/Error Rate/Latency 모두에 영향을 준다.
         annotations:
           summary: "API instance is down (scrape failed)"
           description: |

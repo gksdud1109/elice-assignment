@@ -53,23 +53,27 @@ db_errors_total = Counter(
 
 
 async def observe_requests(request: Request, call_next):
+    # call_next 자체에서 unhandled exception으로 인한 metric 누락 방지
     start = time.perf_counter()
-    response = await call_next(request)
-    elapsed = time.perf_counter() - start
+    status_code = "500"  # 기본값: call_next에서 예외가 raise된 경우
+    try:
+        response = await call_next(request)
+        status_code = str(response.status_code)
+        return response
+    finally:
+        elapsed = time.perf_counter() - start
 
-    # route template(예: /api/v1/courses/{course_id})으로 라벨링하여
-    # 라벨 cardinality를 묶는다. unmatched는 별도 버킷으로 모은다.
-    route_obj = request.scope.get("route")
-    route_path = route_obj.path if route_obj else "__unmatched__"
+        # route template(예: /api/v1/courses/{course_id})으로 라벨링하여
+        # 라벨 cardinality를 묶는다. unmatched는 별도 버킷으로 모은다.
+        route_obj = request.scope.get("route")
+        route_path = route_obj.path if route_obj else "__unmatched__"
 
-    http_requests_total.labels(
-        method=request.method,
-        route=route_path,
-        status=str(response.status_code),
-    ).inc()
-    http_request_duration_seconds.labels(
-        method=request.method,
-        route=route_path,
-    ).observe(elapsed)
-
-    return response
+        http_requests_total.labels(
+            method=request.method,
+            route=route_path,
+            status=status_code,
+        ).inc()
+        http_request_duration_seconds.labels(
+            method=request.method,
+            route=route_path,
+        ).observe(elapsed)
