@@ -268,6 +268,9 @@ incident 발생 시 원인을 좁히는 용도다. 구현은 `psycopg_pool.Conne
 `operation` 라벨은 `readiness`, `list_courses`, `get_course` 세 가지로
 제한되어 cardinality는 안전한 수준이다.
 
+DB 메트릭의 dashboard query는 **5분 window**를 사용한다. paging
+signal(2분 window)과 의도적으로 분리하는 이유와 NaN 처리는 §6.4 참조.
+
 #### DB timeout 계층 (실서비스 확장)
 
 본 과제는 **connection acquire timeout** 하나만 설정한다
@@ -411,15 +414,22 @@ job이 사라진" 케이스도 감지해야 한다.
 
 | 순서 | 패널 | 답하는 질문 |
 |---|---|---|
-| 1 | API Up | 인스턴스가 살아 있는가? |
+| 1 | Scrape Status (api) | scrape가 살아 있는가? (≠ 사용자 가용성) |
 | 2 | Request Rate | 트래픽이 들어오고 있는가? (없으면 SLI 신호 무의미) |
 | 3 | Error Rate % | 사용자가 실패를 보고 있는가? |
 | 4 | Availability % | 장기 추세는 SLO 안에 있는가? |
 | 5 | p95 Latency | 사용자가 느려진다고 느낄 만한가? |
 | 6 | Status Code Distribution | 에러의 종류 분포는? (분류/원인 좁히기) |
+| 7~8 | DB Query Latency / DB Errors Rate | (RCA 보조) 의존성에서 원인이 보이는가? |
 
-위에서 아래로 읽으면 **생존 → 트래픽 → 장기/단기 영향 → 분류** 순서로
-자연스럽게 의사결정이 좁혀진다.
+위에서 아래로 읽으면 **생존 → 트래픽 → 장기/단기 사용자 영향 → 분류 → 의존성**
+순서로 자연스럽게 의사결정이 좁혀진다.
+
+**1번 패널의 명칭에 주의**: `Scrape Status`는 Prometheus가 `/metrics` endpoint에
+도달 가능한지(=process 살아있고 네트워크 OK)만 본다. `up == 1`이라도 사용자
+요청이 5xx로 떨어질 수 있고 (예: DB 의존성 장애), `up == 0`이어도 다른
+인스턴스가 traffic을 받고 있을 수 있다 (멀티 인스턴스 환경). 따라서 사용자
+영향은 항상 #3~5의 user-facing SLI 패널로 판단한다.
 
 ### 6.2 Annotation 통합
 
@@ -445,6 +455,42 @@ marker가 필요하다.
 모든 datasource와 dashboard는 `grafana/provisioning/`로 자동 등록된다.
 수동 설정 없이 `docker compose up`만으로 운영 환경이 재현된다. 이는
 운영 설정을 코드로 관리한다는 SRE 원칙에 맞다.
+
+### 6.4 DB 패널의 window 분리 (paging vs diagnostic)
+
+`HighErrorRate` / `HighLatencyP95`는 **2분 window**로 빠른 감지를 우선한다
+(paging signal). 반면 DB 패널(`DB Query Latency p95`, `DB Errors Rate`)은
+**5분 window**를 사용한다 (diagnostic signal). 분리 이유는 두 가지다.
+
+1. **Diagnostic은 빠른 감지보다 RCA 정확도/안정성이 더 중요**: incident
+   발생 시 운영자가 원인을 좁히는 신호이므로, transient noise보다 stable한
+   추세가 가치 있다.
+2. **Sample 부족 operation의 NaN 회피**: `readiness` 같은 호출 빈도 낮은
+   operation은 2분 윈도우에서 sample이 부족해 `histogram_quantile`이
+   NaN을 반환할 수 있다. 5분 윈도우는 더 많은 sample을 모아 안정 추정을
+   확보한다. 추가로 dashboard query에 `> 0` 후행 필터를 두어 그래도
+   NaN인 series는 표시하지 않는다.
+
+이 window 분리는 **paging의 "빠른 감지"와 diagnostic의 "정확한 진단"을
+의도적으로 분리한 설계**이며, SRE의 detection vs diagnosis 분업 원칙에
+부합한다.
+
+### 6.5 Error Rate / Availability 패널의 0% fallback
+
+`Error Rate` 패널은 5xx가 0건일 때 PromQL 결과가 빈 vector가 되어 dashboard에
+"no data"로 표시된다. 운영자가 "메트릭 수집 실패"로 오해할 수 있어, numerator를
+`or vector(0)`로 감싸 명시적으로 0%로 표시한다.
+
+```promql
+(sum(rate(http_requests_total{route=~"/api/v1/.*",status=~"5.."}[2m])) or vector(0))
+/
+sum(rate(http_requests_total{route=~"/api/v1/.*"}[2m]))
+```
+
+`Availability 1h` 패널에도 같은 방식을 적용한다 (1h 윈도우라 5xx 0건은 더 자주
+발생). 단, **alert rule에는 이 fallback을 적용하지 않는다** — alert는
+트래픽 가드(`and sum(rate(...)) > 0.1`)로 별도 보호되며, fallback과 트래픽
+가드의 의미가 다르다 (fallback은 시각적 명확성, 가드는 false positive 회피).
 
 ---
 
@@ -553,3 +599,6 @@ marker가 필요하다.
 | 16 | `/readyz`는 DB SELECT 1로 검증 — 다만 데모 환경에는 routing 계층이 없어 traffic 차단 미발생 | §2, §7.9 |
 | 17 | DB 메트릭은 diagnostic signal로 분리, paging alert는 user-facing SLI가 담당 | §4.5 |
 | 18 | DB incident는 별도 annotation 없이 `db_errors_total` + readyz 503 + HighErrorRate firing 세 신호로 시각화 | §6.2 |
+| 19 | DB diagnostic 패널은 5m window — paging의 2m과 detection vs diagnosis 원칙으로 분리 | §6.4 |
+| 20 | Error Rate / Availability 패널은 `or vector(0)` fallback — 5xx 0건도 명시 0% 표시 | §6.5 |
+| 21 | API Up 패널을 `Scrape Status (api)`로 명명 — user-facing availability와 의미 분리 | §6.1 |

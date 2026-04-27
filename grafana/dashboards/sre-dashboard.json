@@ -35,7 +35,8 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "API Up",
+      "title": "Scrape Status (api)",
+      "description": "Prometheus가 api 인스턴스의 /metrics를 성공적으로 scrape하는지를 표시 (`up{job=\"api\"}`). **사용자 관점 가용성과 다르다** — process가 살아있어도 사용자 요청은 실패할 수 있고, 그 반대도 가능. 사용자 영향 판단은 Error Rate / Availability 패널 참조.",
       "gridPos": { "h": 8, "w": 4, "x": 0, "y": 3 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
@@ -137,13 +138,13 @@
       "id": 5,
       "type": "timeseries",
       "title": "Error Rate % (alert threshold: 5%)",
-      "description": "5xx ratio over 2m window. 5% 이상이 2분 지속 + RPS > 0.1 일 때 HighErrorRate 알림 발화. 본 패널은 시각화 목적이라 raw ratio만 보여주고, 트래픽 가드는 alert rule(prometheus/alert-rules.yml)에서 처리.",
+      "description": "5xx ratio over 2m window. 5% 이상이 2분 지속 + RPS > 0.1 일 때 HighErrorRate 알림 발화. 트래픽 가드는 alert rule(prometheus/alert-rules.yml)에서 처리. numerator를 `or vector(0)`로 감싸 5xx가 0건일 때 'no data' 대신 0%로 명시 표시.",
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 11 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_requests_total{route=~\"/api/v1/.*\",status=~\"5..\"}[2m])) / sum(rate(http_requests_total{route=~\"/api/v1/.*\"}[2m]))",
+          "expr": "(sum(rate(http_requests_total{route=~\"/api/v1/.*\",status=~\"5..\"}[2m])) or vector(0)) / sum(rate(http_requests_total{route=~\"/api/v1/.*\"}[2m]))",
           "legendFormat": "5xx ratio"
         }
       ],
@@ -185,7 +186,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "1 - (sum(increase(http_requests_total{route=~\"/api/v1/.*\",status=~\"5..\"}[1h])) / sum(increase(http_requests_total{route=~\"/api/v1/.*\"}[1h])))",
+          "expr": "1 - ((sum(increase(http_requests_total{route=~\"/api/v1/.*\",status=~\"5..\"}[1h])) or vector(0)) / sum(increase(http_requests_total{route=~\"/api/v1/.*\"}[1h])))",
           "legendFormat": "availability"
         }
       ],
@@ -261,13 +262,13 @@
       "id": 8,
       "type": "timeseries",
       "title": "DB Query Latency p95 (by operation)",
-      "description": "Diagnostic signal. paging은 user-facing SLI(Error Rate, p95 Latency)가 담당.",
+      "description": "Diagnostic signal. paging은 user-facing SLI가 담당. **5m window** — diagnostic은 빠른 감지보다 RCA 정확도/안정성이 더 중요해 paging의 2m과 의도적 분리. 후행 `> 0` 필터로 sample 부족 시 NaN series 제외 (예: traffic 적은 readiness operation).",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by(operation, le) (rate(db_query_duration_seconds_bucket[2m])))",
+          "expr": "histogram_quantile(0.95, sum by(operation, le) (rate(db_query_duration_seconds_bucket[5m]))) > 0",
           "legendFormat": "{{operation}}"
         }
       ],
@@ -294,13 +295,13 @@
       "id": 9,
       "type": "timeseries",
       "title": "DB Errors Rate (by operation)",
-      "description": "Diagnostic signal. PoolTimeout, query failure 등 DB 호출 실패 비율.",
+      "description": "Diagnostic signal. **5m window** — paging signal과 의도적 분리, RCA 안정성 확보. PoolTimeout, query failure 등 DB 호출 실패 비율.",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by(operation) (rate(db_errors_total[2m]))",
+          "expr": "sum by(operation) (rate(db_errors_total[5m]))",
           "legendFormat": "{{operation}}"
         }
       ],
