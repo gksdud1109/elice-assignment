@@ -39,7 +39,10 @@ def apply_fault() -> bool:
     if mode in ("slow", "flaky") and delay_ms > 0:
         time.sleep(delay_ms / 1000.0)
 
-    if mode in ("error", "flaky") and error_rate > 0:
+    if mode == "error":
+        return True
+
+    if mode == "flaky" and error_rate > 0:
         if random.random() < error_rate:
             return True
 

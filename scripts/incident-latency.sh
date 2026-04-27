@@ -43,6 +43,12 @@ curl -fsS "$API/healthz" > /dev/null
 curl -fsS "$PROM/-/ready" > /dev/null
 log "OK"
 
+# latency 시나리오도 이전 fault-mode 잔여 상태를 제거한 뒤 시작한다.
+log "reset fault-mode to normal"
+curl -fsS -X POST "$API/admin/fault-mode" \
+    -H 'Content-Type: application/json' \
+    -d '{"mode":"normal"}' > /dev/null
+
 # baseline은 이전 시나리오의 잔여 데이터가 있을 수 있으니 추가로 90s 안정화
 log "t0: baseline 안정화 (90s — rolling window 완전 비우기)"
 sleep 90

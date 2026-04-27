@@ -57,6 +57,13 @@ curl -fsS "$API/healthz" > /dev/null || { log "API not up — run: docker compos
 curl -fsS "$PROM/-/ready" > /dev/null || { log "Prometheus not ready"; exit 1; }
 log "OK"
 
+# DB stop 시나리오는 dependency failure만 검증한다. 이전 실행에서 남은
+# application fault-mode가 섞이면 5xx/latency 원인이 모호해진다.
+log "reset fault-mode to normal"
+curl -fsS -X POST "$API/admin/fault-mode" \
+    -H 'Content-Type: application/json' \
+    -d '{"mode":"normal"}' > /dev/null
+
 # ─── t0: baseline ───────────────────────────────────────────────
 log "t0: baseline 안정화 (60s)"
 sleep 60
