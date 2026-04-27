@@ -12,7 +12,8 @@
 
 문서:
 
-- 설계 문서: [docs/sli_slo_design.md](docs/sli_slo_design.md)
+- 설계 문서: [docs/sli_slo_design.md](docs/sli_slo_design.md) ([PDF](docs/sli_slo_design.pdf))
+- Incident report (RCA): [docs/incident_report.md](docs/incident_report.md) ([PDF](docs/incident_report.pdf))
 - Incident evidence: [evidence/README.md](evidence/README.md)
 
 ## Quick Start
@@ -181,8 +182,8 @@ prometheus/          scrape config, alert rules
 grafana/             datasource/dashboard provisioning
 k6/                  baseline traffic
 scripts/             incident automation
-evidence/            captured alert/metric evidence
-docs/                design and incident documents
+evidence/            captured alert/metric evidence (JSON)
+docs/                sli_slo_design.{md,pdf}, incident_report.{md,pdf}
 docker-compose.yml
 ```
 

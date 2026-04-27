@@ -115,6 +115,13 @@ PromQL로 문서화한다.
 4xx는 서비스 신뢰성 실패로 보지 않고 성공으로 분류한다. 인증 실패나 비정상 404
 증가는 별도 운영 신호로 확장할 수 있다.
 
+### Burn rate
+
+Error budget 0.1% 대비 alert 임계 5%는 burn rate 50x — 30일 SLO를 14.4시간
+안에 침범하는 속도다. 운영자가 롤백 또는 트래픽 차단으로 개입할 시간 여유를
+확보하도록 alert 임계와 윈도우를 설정했다. 정밀한 multi-window
+multi-burn-rate 알림은 한계와 확장 방향에서 다룬다.
+
 ---
 
 ## 4. Metrics 설계
@@ -183,6 +190,11 @@ SLO는 장기 목표이고, alert는 운영자 개입이 필요한 신호다. al
 
 모든 rule은 `prometheus/alert-rules.yml`에 코드로 관리한다.
 
+scrape 자체가 실패하면 (`up == 0`) ratio alert의 expr이 NaN이 되어 evaluation이
+멈춘다. 이 경우 `APIInstanceDown`이 단독으로 paging을 담당하므로 ratio alert에
+`up == 1`을 추가 조건으로 묶지 않는다. 이는 paging 채널의 공백을 만들지 않으면서
+"트래픽이 있을 때만 의미 있는 신호"라는 ratio alert의 의도를 깨끗하게 유지한다.
+
 ---
 
 ## 6. Dashboard 설계
@@ -246,6 +258,7 @@ Grafana UI에서 수동 설정을 하지 않아도 된다.
 | 단일 임계 alert | 구현 단순성 | multi-window multi-burn-rate alert |
 | 구조화 로그/trace 없음 | 범위 통제 | OpenTelemetry, Loki/Tempo |
 | `/admin/fault-mode` 인증 없음 | 장애 재현 편의 | 내부망 격리, 인증, 별도 admin plane |
+| DB timeout 1계층만 적용 | 단순 조회 API라 statement timeout 모델링 불필요 | acquire(`pool.connection(timeout=...)`) + `statement_timeout` + `connect_timeout` 3계층 분리 설정 |
 
 이 프로젝트는 복잡한 인프라를 많이 붙이는 것이 아니라, 작은 서비스를 대상으로
 정상 상태를 정의하고 그 기준이 깨지는 흐름을 데이터로 검증하는 데 집중한다.
