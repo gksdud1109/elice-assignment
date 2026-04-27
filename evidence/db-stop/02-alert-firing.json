@@ -1,0 +1,95 @@
+{
+  "phase": "02-incident-firing",
+  "timestamp": "2026-04-27 20:51:12 +0900",
+  "alerts": [
+    {
+      "name": "HighErrorRate",
+      "state": "firing",
+      "severity": "critical",
+      "active_since": "2026-04-27T11:49:07.793446704Z",
+      "value": "1e+00",
+      "annotations_summary": "User-facing 5xx error rate > 5%"
+    },
+    {
+      "name": "HighLatencyP95",
+      "state": "firing",
+      "severity": "warning",
+      "active_since": "2026-04-27T11:49:07.793446704Z",
+      "value": "4.8500000000000005e+00",
+      "annotations_summary": "User-facing p95 latency > 500ms"
+    }
+  ],
+  "metrics": {
+    "scrape_status": [
+      {
+        "labels": {
+          "instance": "api:8000",
+          "job": "api",
+          "service": "courses-api"
+        },
+        "value": "1"
+      }
+    ],
+    "request_rate_1m": [
+      {
+        "labels": {
+          "status": "200"
+        },
+        "value": "0"
+      },
+      {
+        "labels": {
+          "status": "500"
+        },
+        "value": "1.981818181818182"
+      }
+    ],
+    "error_rate_2m": [
+      {
+        "labels": {},
+        "value": "1"
+      }
+    ],
+    "availability_1h": [
+      {
+        "labels": {},
+        "value": "0.7322563980511665"
+      }
+    ],
+    "latency_p95_2m": [
+      {
+        "labels": {},
+        "value": "4.85"
+      }
+    ],
+    "db_errors_5m": [
+      {
+        "labels": {
+          "operation": "list_courses"
+        },
+        "value": "0.4961345664916936"
+      },
+      {
+        "labels": {
+          "operation": "get_course"
+        },
+        "value": "0.49957994542566364"
+      }
+    ],
+    "db_latency_p95_5m": [
+      {
+        "labels": {
+          "operation": "list_courses"
+        },
+        "value": "2"
+      },
+      {
+        "labels": {
+          "operation": "get_course"
+        },
+        "value": "2"
+      }
+    ],
+    "fault_mode_active": null
+  }
+}

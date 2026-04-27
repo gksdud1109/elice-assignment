@@ -1,0 +1,21 @@
+Latency Incident Timeline
+==========================
+incident_start (slow 주입):    20:56:14
+alert_firing (detection):      20:58:45
+recovery_start (normal 복귀):  20:58:45
+alert_resolved:                21:00:46
+
+Evidence files (in evidence/latency):
+  01-baseline.json         normal mode, no alerts
+  02-alert-firing.json     slow mode, HighLatencyP95 firing (Error Rate는 변동 없음)
+  03-alert-resolved.json   normal mode 복귀, alert resolved
+
+복구 기준 검증:
+  ✓ Prometheus alert resolved
+  ✓ p95 latency < 300ms (03 evidence에서 확인)
+  ✓ Error Rate는 변동 없음 (이 시나리오는 latency만 영향)
+
+주의: 본 evidence는 db-stop 시나리오 직후에 캡처되었습니다. baseline JSON의
+db_errors_5m 패널에 직전 incident의 5m rolling window 잔여가 남아있을 수
+있습니다. 깨끗한 baseline을 원하면 두 시나리오 사이 5분 이상 대기하거나
+latency 시나리오를 먼저 실행하세요.

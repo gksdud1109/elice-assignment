@@ -1,0 +1,19 @@
+DB Stop Incident Timeline
+==========================
+incident_start (DB stopped):  20:48:41
+alert_firing (detection):     20:51:12
+recovery_start (DB started):  20:51:12
+service_recovered (readyz):   20:52:47
+alert_fully_resolved:         20:54:33
+
+Evidence files (in evidence/db-stop):
+  01-baseline.json             DB up, no alerts
+  02-alert-firing.json         DB down, HighErrorRate firing (HighLatencyP95도 동반 firing 가능)
+  03-service-recovered.json    /readyz=200, 단 alert는 아직 firing (rolling 2m window 잔존)
+  04-alert-resolved.json       모든 alert resolved (단, db_errors_5m은 rolling 5m window로 여전히 non-zero일 수 있음)
+
+복구 기준 검증:
+  ✓ Prometheus alert resolved
+  ✓ /readyz = 200
+  ✓ DB error rate 감소 추세 + alert resolved 확인
+    (db_errors_5m은 rolling 5m window 특성상 04 시점에도 잔여 가능)

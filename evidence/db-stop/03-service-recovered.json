@@ -1,0 +1,107 @@
+{
+  "phase": "03-recovered-partial",
+  "timestamp": "2026-04-27 20:52:48 +0900",
+  "alerts": [
+    {
+      "name": "HighErrorRate",
+      "state": "firing",
+      "severity": "critical",
+      "active_since": "2026-04-27T11:49:07.793446704Z",
+      "value": "1e+00",
+      "annotations_summary": "User-facing 5xx error rate > 5%"
+    },
+    {
+      "name": "HighLatencyP95",
+      "state": "firing",
+      "severity": "warning",
+      "active_since": "2026-04-27T11:49:07.793446704Z",
+      "value": "4.85e+00",
+      "annotations_summary": "User-facing p95 latency > 500ms"
+    }
+  ],
+  "metrics": {
+    "scrape_status": [
+      {
+        "labels": {
+          "instance": "api:8000",
+          "job": "api",
+          "service": "courses-api"
+        },
+        "value": "1"
+      }
+    ],
+    "request_rate_1m": [
+      {
+        "labels": {
+          "status": "200"
+        },
+        "value": "1.2542945956263294"
+      },
+      {
+        "labels": {
+          "status": "500"
+        },
+        "value": "1.763283706894985"
+      }
+    ],
+    "error_rate_2m": [
+      {
+        "labels": {},
+        "value": "0.7587412587412588"
+      }
+    ],
+    "availability_1h": [
+      {
+        "labels": {},
+        "value": "0.6496056614148598"
+      }
+    ],
+    "latency_p95_2m": [
+      {
+        "labels": {},
+        "value": "4.8023041474654375"
+      }
+    ],
+    "db_errors_5m": [
+      {
+        "labels": {
+          "operation": "list_courses"
+        },
+        "value": "0.7909873689712178"
+      },
+      {
+        "labels": {
+          "operation": "get_course"
+        },
+        "value": "0.79780622560028"
+      },
+      {
+        "labels": {
+          "operation": "readiness"
+        },
+        "value": "0.014307363655487708"
+      }
+    ],
+    "db_latency_p95_5m": [
+      {
+        "labels": {
+          "operation": "list_courses"
+        },
+        "value": "2"
+      },
+      {
+        "labels": {
+          "operation": "get_course"
+        },
+        "value": "2"
+      },
+      {
+        "labels": {
+          "operation": "readiness"
+        },
+        "value": "1.95"
+      }
+    ],
+    "fault_mode_active": null
+  }
+}
