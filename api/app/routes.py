@@ -1,48 +1,55 @@
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from pydantic import BaseModel, Field
 
 from .config import FaultMode
+from .db import check_ready, fetch_course_by_id, fetch_courses
 from .fault import apply_fault, fault_state
 from .metrics import set_fault_mode_metric
 
 router = APIRouter()
 
-COURSES = [
-    {"id": 1, "title": "Intro to SRE", "instructor": "Ben Treynor"},
-    {"id": 2, "title": "Distributed Systems", "instructor": "Leslie Lamport"},
-    {"id": 3, "title": "Observability 101", "instructor": "Charity Majors"},
-]
-
 
 @router.get("/healthz")
 def healthz():
+    # liveness probe — 프로세스 생존만 확인. DB 상태는 보지 않는다.
     return {"status": "ok"}
 
 
 @router.get("/readyz")
 def readyz():
-    # 외부 의존성(DB/캐시/큐)이 없으므로 readiness는 프로세스의 요청 수락
-    # 가능 여부만 검증한다. 자세한 근거는 docs/sli_slo_design.md §2 참고.
-    return {"status": "ready"}
+    # readiness probe — DB에 SELECT 1을 수행한다. 실패시 503.
+    # 운영 환경에서는 K8s readiness probe 또는 LB health check가 503을 보고
+    # 트래픽을 차단하지만, 본 docker-compose 환경에는 routing 계층이 없으므로
+    # 503이 자동 트래픽 차단으로 이어지지는 않는다 — sli_slo_design.md §2.
+    if check_ready():
+        return {"status": "ready"}
+    return JSONResponse(status_code=503, content={"status": "not_ready"})
 
 
 @router.get("/api/v1/courses")
 def list_courses():
     if apply_fault():
         raise HTTPException(status_code=500, detail="injected fault")
-    return {"courses": COURSES}
+    try:
+        courses = fetch_courses()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"db error: {e.__class__.__name__}")
+    return {"courses": courses}
 
 
 @router.get("/api/v1/courses/{course_id}")
 def get_course(course_id: int):
     if apply_fault():
         raise HTTPException(status_code=500, detail="injected fault")
-    for c in COURSES:
-        if c["id"] == course_id:
-            return c
-    raise HTTPException(status_code=404, detail="course not found")
+    try:
+        course = fetch_course_by_id(course_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"db error: {e.__class__.__name__}")
+    if course is None:
+        raise HTTPException(status_code=404, detail="course not found")
+    return course
 
 
 class FaultModeRequest(BaseModel):

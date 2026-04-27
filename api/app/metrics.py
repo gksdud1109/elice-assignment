@@ -35,6 +35,23 @@ def set_fault_mode_metric(active_mode: str) -> None:
 set_fault_mode_metric("normal")
 
 
+# DB 메트릭은 RCA 보조 (diagnostic) 신호로만 사용한다. paging alert는
+# user-facing SLI(HighErrorRate, HighLatencyP95)가 담당하며, DB 자체에
+# 대한 alert는 만들지 않는다 — docs/sli_slo_design.md §4.5 참고.
+db_query_duration_seconds = Histogram(
+    "db_query_duration_seconds",
+    "Database query duration in seconds",
+    ["operation"],
+    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0),
+)
+
+db_errors_total = Counter(
+    "db_errors_total",
+    "Total database errors (connection or query failure)",
+    ["operation"],
+)
+
+
 async def observe_requests(request: Request, call_next):
     start = time.perf_counter()
     response = await call_next(request)

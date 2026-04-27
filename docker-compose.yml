@@ -1,9 +1,35 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sre-postgres
+    environment:
+      POSTGRES_USER: elice
+      POSTGRES_PASSWORD: elice
+      POSTGRES_DB: elice
+    volumes:
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      # pg_isready는 lightweight, accept 가능 여부만 본다. SELECT 1 수준의
+      # query readiness까지는 보장하지 않으므로 api는 startup에서 직접 검증.
+      test: ["CMD-SHELL", "pg_isready -U elice -d elice"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   api:
     build: ./api
     container_name: sre-api
     ports:
       - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://elice:elice@postgres:5432/elice
+    depends_on:
+      # service_healthy는 startup ordering 보장일 뿐, 운영 중 DB 장애시
+      # 자동 복구는 하지 않는다. 운영 환경에서는 connection pool retry +
+      # readiness probe 기반 traffic routing이 추가되어야 한다.
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
 
   prometheus:
