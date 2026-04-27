@@ -19,7 +19,7 @@ groups:
         labels:
           severity: critical
           service: courses-api
-          # slo 라벨은 의도적으로 미부여 — instance down은 단일 SLI에 매핑되지
+          # slo 라벨은 의도적으로 미부여. instance down은 단일 SLI에 매핑되지
           # 않고 Availability/Error Rate/Latency 모두에 영향을 준다.
         annotations:
           summary: "API instance is down (scrape failed)"
@@ -48,7 +48,7 @@ groups:
           summary: "User-facing 5xx error rate > 5%"
           description: |
             사용자 API의 5xx 비율이 2분간 5%를 초과 (트래픽 > 0.1 RPS).
-            burn rate ≈ 50x — 이 속도가 14.4시간 지속되면 30일 SLO(99.9%) 침범.
+            burn rate 약 50x. 이 속도가 14.4시간 지속되면 30일 SLO(99.9%) 침범.
           impact: "사용자가 요청 실패를 직접 보고 있음. error budget 빠르게 소진 중."
           runbook: "README.md#runbook-higherrorrate"
 
@@ -68,8 +68,8 @@ groups:
           summary: "User-facing p95 latency > 500ms"
           description: |
             사용자 API p95 응답 시간이 2분간 500ms 초과 (트래픽 > 0.1 RPS).
-            SLO 300ms 침범. histogram bucket이 0.3/0.5에 정확히 위치 (오차 최소).
+            SLO 300ms 침범. histogram bucket에 0.3/0.5를 포함해 임계값 근처 오차를 줄임.
           impact: |
             사용자가 응답 지연을 체감 (degraded UX). 5xx는 아니지만 client timeout
-            전환 위험. 지속 시 runbook의 escalation 정책 적용.
+            전환 위험.
           runbook: "README.md#runbook-highlatencyp95"

@@ -114,13 +114,11 @@ SLO 근거:
 | DB 지연 | `db_query_duration_seconds{operation}` | RCA 보조 |
 | DB 오류 | `db_errors_total{operation}` | RCA 보조 |
 
-`route` 라벨은 실제 URL이 아니라 route template을 사용합니다.
+course id마다 시계열이 늘어나는 문제를 피하기 위해 `route` 라벨은 실제 URL이 아니라 route template을 사용합니다.
 
 ```text
 /api/v1/courses/1  -> /api/v1/courses/{course_id}
 ```
-
-이렇게 해야 course id마다 시계열이 늘어나는 문제를 피할 수 있습니다.
 
 Latency bucket은 SLO와 alert 임계 근처에 맞췄습니다.
 
@@ -143,14 +141,13 @@ Alert는 cause가 아니라 user-facing symptom을 기준으로 둡니다.
 | `HighErrorRate` | 5xx 비율 > 5% and RPS > 0.1 | 2m | critical | 사용자 실패 |
 | `HighLatencyP95` | p95 > 500ms and RPS > 0.1 | 2m | warning | 사용자 지연 |
 
-Error Rate와 Latency alert에는 traffic guard를 둡니다.
+
+트래픽이 거의 없으면 비율 신호가 의미 없고, 1건의 실패가 100%처럼 보일 수
+있기 때문에 Error Rate와 Latency alert에는 traffic guard를 둡니다.
 
 ```promql
 and sum(rate(http_requests_total{route=~"/api/v1/.*"}[2m])) > 0.1
 ```
-
-트래픽이 거의 없으면 비율 신호가 의미 없고, 1건의 실패가 100%처럼 보일 수
-있기 때문입니다.
 
 SLO와 alert 임계값은 분리합니다.
 
@@ -191,10 +188,19 @@ DB 패널은 RCA 안정성을 위해 5분 window를 사용합니다.
 
 ## 7. 장애 검증
 
-| 시나리오 | Trigger | 기대 신호 |
-|:--|:--|:--|
-| DB stop | `fault-mode=normal`에서 `docker stop sre-postgres` | `/readyz` 503, 사용자 5xx 증가, `HighErrorRate` firing, DB error 증가 |
-| Latency fault | DB 정상 상태에서 `POST /admin/fault-mode {"mode":"slow"}` | p95 latency 증가, `HighLatencyP95` firing, Error Rate 정상 |
+문항 1이 요구한 API 3 동작(정상/지연/5xx)을 incident 시나리오와 1:1로
+매핑합니다.
+
+| 시나리오 | API 동작 | Trigger | 기대 신호 | Layer |
+|:--|:--|:--|:--|:--|
+| Latency fault | 의도적 응답 지연 | `POST /admin/fault-mode {"mode":"slow","delay_ms":700}` | `HighLatencyP95`만 firing, Error Rate 정상, DB 오류 없음 | application |
+| Application 5xx | 의도적 오류 (5xx) | `POST /admin/fault-mode {"mode":"flaky","error_rate":0.3}` | `HighErrorRate`만 firing, latency 정상, DB 오류 series 없음 | application |
+| DB stop (확장) | 해당 없음 | `fault-mode=normal`에서 `docker stop sre-postgres` | `/readyz` 503, `HighErrorRate` + `HighLatencyP95` 동반 firing, DB error 증가 | dependency |
+
+DB stop은 의존성 장애가 사용자 SLI로 전파되는 흐름을 검증하기 위한 확장
+시나리오입니다. 같은 `HighErrorRate` alert가 application(`flaky`)과 dependency
+(`DB stop`)에서 모두 발생할 수 있으며, dashboard의 DB diagnostic 패널이 두
+layer를 구분합니다.
 
 복구는 명령 실행이 아니라 지표로 판단합니다.
 

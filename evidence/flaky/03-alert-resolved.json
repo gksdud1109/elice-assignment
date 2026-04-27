@@ -1,0 +1,65 @@
+{
+  "phase": "03-alert-resolved",
+  "timestamp": "2026-04-28 00:00:47 +0900",
+  "alerts": [],
+  "metrics": {
+    "scrape_status": [
+      {
+        "labels": {
+          "instance": "api:8000",
+          "job": "api",
+          "service": "courses-api"
+        },
+        "value": "1"
+      }
+    ],
+    "request_rate_1m": [
+      {
+        "labels": {
+          "status": "200"
+        },
+        "value": "9.853828812450004"
+      },
+      {
+        "labels": {
+          "status": "500"
+        },
+        "value": "0"
+      }
+    ],
+    "error_rate_2m": [
+      {
+        "labels": {},
+        "value": "0"
+      }
+    ],
+    "availability_1h": [
+      {
+        "labels": {},
+        "value": "0.9744949717167323"
+      }
+    ],
+    "latency_p95_2m": [
+      {
+        "labels": {},
+        "value": "0.047499999999999994"
+      }
+    ],
+    "db_errors_5m": null,
+    "db_latency_p95_5m": [
+      {
+        "labels": {
+          "operation": "list_courses"
+        },
+        "value": "0.00742990654205608"
+      },
+      {
+        "labels": {
+          "operation": "get_course"
+        },
+        "value": "0.005245614035087698"
+      }
+    ],
+    "fault_mode_active": null
+  }
+}

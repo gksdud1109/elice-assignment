@@ -55,7 +55,8 @@ docker compose --profile load down -v
 | POST | `/admin/fault-mode` | 제외 | 장애 주입 |
 | GET | `/metrics` | 제외 | Prometheus scrape |
 
-> 장애 주입은 `scripts`에 구성되어있는 incident 스크립트에서 모두 자동화 되어있습니다.</br>
+장애 주입은 incident 스크립트로 자동화되어 있으며, 아래 명령으로 수동 확인도
+가능합니다.
 
 직접 확인용 장애 주입 예시:
 
@@ -89,28 +90,45 @@ curl -fsS -X POST http://localhost:8000/admin/fault-mode \
 docker compose --profile load up -d --build
 ```
 
-메인 시나리오: Postgres 중지
+문항 1이 요구하는 API 3 동작(정상 응답 / 의도적 지연 / 의도적 5xx)을 incident
+시나리오와 1:1 매핑합니다. 추가로 dependency layer 장애 시나리오 1개를 확장
+검증으로 둡니다.
 
-```bash
-bash scripts/incident-db-stop.sh
-```
-
-의도: DB 장애가 사용자 5xx, `HighErrorRate`, DB diagnostic metric으로 전파되는지
-검증합니다. 스크립트는 시작 시 `fault-mode=normal`로 초기화해 애플리케이션
-장애 주입과 DB 장애를 분리합니다. DB timeout 영향으로 `HighLatencyP95`가 함께
-firing될 수 있습니다.
-
-보조 시나리오: latency fault
+application layer: 의도적 지연
 
 ```bash
 bash scripts/incident-latency.sh
 ```
 
 의도: 5xx 없이 p95 latency만 악화되는 경우 `HighLatencyP95`가 firing되는지
-검증합니다. 이 시나리오는 application fault-mode만 사용하며 DB는 정상 상태로
-둡니다.
+검증합니다. application fault-mode `slow`만 사용하며 DB는 정상 상태로 둡니다.
 
-각 스크립트는 `evidence/<scenario>/`에 JSON evidence와 timeline을 저장합니다.
+application layer: 의도적 5xx
+
+```bash
+bash scripts/incident-flaky.sh
+```
+
+의도: 일부 사용자 요청만 5xx로 떨어질 때 `HighErrorRate`가 firing되는지
+검증합니다.
+fault-mode `flaky`(error_rate=0.3)로 application layer의 5xx를 재현합니다. 이
+시나리오에서는 DB 오류 series가 생성되지 않고 latency p95도 정상 범위에 남아,
+dependency 장애와 구분됩니다.
+
+dependency layer 확장: Postgres 중지
+
+```bash
+bash scripts/incident-db-stop.sh
+```
+
+의도: DB 장애가 사용자 5xx, `HighErrorRate`, DB diagnostic metric으로 전파되는지
+검증합니다. 시작 시 `fault-mode=normal` 초기화로 application/dependency 장애를
+분리합니다. DB timeout 영향으로 `HighLatencyP95`가 함께 firing될 수 있어
+같은 `HighErrorRate`도 application(`flaky`) vs dependency(`db-stop`)
+시그니처가 구분됩니다.
+
+각 스크립트는 시작 시 `fault-mode=normal` 초기화 + 기존 evidence 정리 후
+`evidence/<scenario>/`에 JSON과 timeline을 저장합니다.
 
 복구 기준:
 

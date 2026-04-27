@@ -1,0 +1,22 @@
+Flaky (Application 5xx) Incident Timeline
+==========================================
+incident_start (flaky 30%):    23:56:00
+alert_firing (detection):      23:58:46
+recovery_start (normal 복귀):  23:58:46
+alert_resolved:                00:00:47
+
+Evidence files (in evidence/flaky):
+  01-baseline.json         normal mode, no alerts
+  02-alert-firing.json     flaky mode, HighErrorRate firing (Latency p95는 변동 없음, DB clean)
+  03-alert-resolved.json   normal mode 복귀, alert resolved
+
+복구 기준 검증:
+  ✓ Prometheus alert resolved
+  ✓ Error Rate < 1%
+  ✓ Latency p95 정상 (이 시나리오는 latency 영향 없음)
+  ✓ DB error rate = 0 (application layer 장애이므로 DB는 무영향)
+
+이 시나리오의 차별점 (DB stop 대비):
+  - HighErrorRate는 fires하지만 HighLatencyP95는 fires 안 함 (latency 정상)
+  - db_errors_5m, db_latency_p95_5m 모두 정상 (DB diagnostic clean)
+  - Application layer 5xx의 시그니처 — root cause가 dependency가 아닌 application
